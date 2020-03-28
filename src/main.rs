@@ -3,6 +3,13 @@ use serialport::prelude::*;
 use serialport::SerialPortType;
 use std::time::Duration;
 use std::io::{self, Write};
+use std::fs;
+use std::env;
+use std::fs::File;
+use std::io::Read;
+
+// Baud rate 
+// 9600,19200,57600,115200
 
 #[derive(StructOpt)]
 #[structopt(about = "Milandr 1986 firmware uploader", rename_all = "kebab-case")]
@@ -44,20 +51,14 @@ fn auto_port_name() -> Result<String, serialport::Error> {
 
             match mdr_ports.len() {
                 0 => { 
-                    return Err(serialport::Error::new(
-                            serialport::ErrorKind::Unknown,
-                            "No ports found",
-                    )); 
+                    return Err(serialport::Error::new( serialport::ErrorKind::Unknown, "No ports found")); 
                 },
                 1 => {
                     return Ok(mdr_ports.last().unwrap().port_name.clone())
                 },
                 n => {
                     println!("Found {} ports:", n);
-                    return Err(serialport::Error::new(
-                            serialport::ErrorKind::Unknown,
-                            "open() not implemented for platform",
-                    )); 
+                    return Err(serialport::Error::new( serialport::ErrorKind::Unknown, "open() not implemented for platform")); 
                 }
             };
         }
@@ -76,6 +77,7 @@ fn main() {
     let mut settings: SerialPortSettings = Default::default();
 
     settings.timeout = Duration::from_millis(10);
+
     if let Ok(rate) = args.baud_rate.parse::<u32>() {
         settings.baud_rate = rate.into();
     } else {
@@ -83,20 +85,33 @@ fn main() {
         ::std::process::exit(1);
     }
 
-    // println!("{}", auto_port_name().unwrap())
-    let port_name = auto_port_name().unwrap();
+    // try to discover port
+    let port_name = match auto_port_name() {
+        Ok(name) => name,
+        Err(error) => {
+            eprintln!("Error: '{}'", error);
+            ::std::process::exit(1);
+        }
+    };
 
     // match serialport::open_with_settings(&args.port_name, &settings) {
     match serialport::open_with_settings(&port_name, &settings) {
         Ok(mut port) => {
-            let mut serial_buf: Vec<u8> = vec![0; 1000];
-            println!("Receiving data on {} at {} baud:", port_name, settings.baud_rate);
-            loop {
-                match port.read(serial_buf.as_mut_slice()) {
-                    Ok(t) => io::stdout().write_all(&serial_buf[..t]).unwrap(),
-                    Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
-                    Err(e) => eprintln!("{:?}", e),
+            // read firmware file
+            let mut f = File::open(&args.path).expect("no file found");
+            let buf_len = f.metadata().unwrap().len() as usize;
+            let mut buffer = vec![0; buf_len];
+            f.read(&mut buffer).expect("buffer overflow");
+
+            println!("Writing {} bytes on {} at {} baud:", buf_len, port_name, settings.baud_rate);
+
+            match port.write(&buffer) {
+                Ok(_) => {
+                    println!("Done!");
+                    std::io::stdout().flush().unwrap();
                 }
+                Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
+                Err(e) => eprintln!("{:?}", e)
             }
         }
         Err(e) => {

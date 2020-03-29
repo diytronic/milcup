@@ -3,44 +3,41 @@ use std::{
         self, 
         Write,  
         prelude::*, 
-        BufReader,
-        Error,
-        ErrorKind,
+        // BufReader,
+        // Error,
+        // ErrorKind,
     },
-    time::Duration,
+    // time::Duration,
     boxed::Box,
 };
 
 use serialport::{
     prelude::*,
-    SerialPortType,
+    // SerialPortType,
 };
 
-pub fn check_port(mut port: Box<dyn SerialPort>) -> Result<String, Error> {
+#[derive(Debug)]
+pub enum FlashError {
+    Io(io::Error),
+}
+
+impl From<io::Error> for FlashError {
+    fn from(err: io::Error) -> FlashError {
+        FlashError::Io(err)
+    }
+}
+
+pub fn check_port(port: &mut Box<dyn SerialPort>) -> Result<(), FlashError> {
+    // write 512 zero bytes
     let mut buf: Vec<u8> = vec![0; 512];
-    // println!("{:?}", buf);
-    match port.write(&buf) {
-        Ok(_) => std::io::stdout().flush().unwrap(),
-        Err(e) => return Err(Error::new(ErrorKind::Other, "Unable to write data")),
-    }
+    port.write(&buf)?;
+    std::io::stdout().flush().unwrap();
 
+    // try to read 3 ones
     buf = vec![0; 3];
-    match port.read(buf.as_mut_slice()) {
-        Ok(t) => io::stdout().write_all(&buf[..t]).unwrap(),
-        Err(e) => {
-            buf = vec![0; 512];
-            match port.write(&buf) {
-                Ok(_) => std::io::stdout().flush().unwrap(),
-                Err(e) => return Err(Error::new(ErrorKind::Other, "Unable to write data 2!")),
-            }
+    port.read(buf.as_mut_slice())?;
 
-            buf = vec![0; 3];
-            match port.read(buf.as_mut_slice()) {
-                Ok(t) => io::stdout().write_all(&buf[..t]).unwrap(),
-                Err(e) => return Err(Error::new(ErrorKind::Other, "Unable to read 512 ones")),
-            }
-        }
-    }
+    // println!("Read {:?}", buf);
 
-    return Ok("wow".to_string());
+    return Ok(());
 }

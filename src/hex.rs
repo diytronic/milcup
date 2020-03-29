@@ -13,7 +13,7 @@ use ihex::{
 pub struct HexFile {
     pub dwadrbot: u32,
     pub ilboot: u32,
-    pub size: u16,
+    pub size: usize,
     pub buffer: Vec<u8>
 }
 
@@ -85,7 +85,7 @@ pub fn read_hex_file(max_size: usize, filename: &Path) -> Result<HexFile, String
     let hex_file = HexFile {
         dwadrbot: 1,
         ilboot: 2,
-        size: 3,
+        size: file_data_len,
         buffer: vec![1, 2, 3],
     };
 

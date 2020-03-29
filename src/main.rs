@@ -21,7 +21,7 @@ mod com;
 struct Cli {
     // #[structopt(default_value = "auto", short = "p", long = "port")]
     // port_name: String,
-    #[structopt(default_value = "9600", short = "b", long = "baud")]
+    #[structopt(default_value = "115200", short = "b", long = "baud")]
     baud_rate: String,
     #[structopt(parse(from_os_str))]
     path: std::path::PathBuf,
@@ -84,16 +84,18 @@ fn main() {
 
     let mut settings: SerialPortSettings = Default::default();
 
-    settings.timeout = Duration::from_millis(1000);
+    settings.timeout = Duration::from_millis(3000);
+    // 9600,19200,57600,115200
+    settings.baud_rate = 9600;
 
-    if let Ok(rate) = args.baud_rate.parse::<u32>() {
-        settings.baud_rate = rate.into();
-        println!("Baud rate: {}", settings.baud_rate);
-    } else {
-        eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
-        ::std::process::exit(1);
-    }
-
+    // if let Ok(rate) = args.baud_rate.parse::<u32>() {
+    //     settings.baud_rate = rate.into();
+    //     println!("Baud rate: {}", settings.baud_rate);
+    // } else {
+    //     eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
+    //     ::std::process::exit(1);
+    // }
+    //
     // let hex_file = "1986_BOOT_UART.hex";
     // let hex_file = "LDM-K1986BE92QI_LIGHT.HEX";
     // match hex::read_hex_file(0x80000, std::path::Path::new(hex_file)) {
@@ -105,7 +107,7 @@ fn main() {
     //         ::std::process::exit(1);
     //     }
     // };
-    //
+    
     // try to discover port
     let port_name = match probe_port() {
         Ok(name) => name,
@@ -124,25 +126,64 @@ fn main() {
             // let mut buffer = vec![0; buf_len];
             // f.read(&mut buffer).expect("buffer overflow");
             //
-            // println!("Writing {} bytes on {} at {} baud:", buf_len, port_name, settings.baud_rate);
-            //
-            // match port.write(&buffer) {
-            //     Ok(_) => {
-            //         println!("Done!");
-            //         std::io::stdout().flush().unwrap();
-            //     }
-            //     Err(ref e) if e.kind() == io::ErrorKind::TimedOut => (),
-            //     Err(e) => eprintln!("{:?}", e)
-            // }
-            //
             println!("Checking port");
             match com::check_port(&mut port) {
                 Ok(_) => println!("ok"),
                 Err(e) => {
-                    match com::check_port(&mut port) {
-                        Ok(_) => println!("ok"),
-                        Err(e) =>  eprintln!("{:?}", e),
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+
+            if let Ok(rate) = args.baud_rate.parse::<u32>() {
+                println!("Set baud rate {}", rate);
+                match com::set_baud_rate(&mut port, rate) {
+                    Ok(_) => println!("ok"),
+                    Err(e) => {
+                        eprintln!("{:?}", e);
+                        ::std::process::exit(1);
                     }
+                }
+            } else {
+                eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
+                ::std::process::exit(1);
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to open \"{}\". Error: {}", port_name, e);
+            ::std::process::exit(1);
+        }
+    }
+
+    if let Ok(rate) = args.baud_rate.parse::<u32>() {
+        settings.baud_rate = rate.into();
+        settings.timeout = Duration::from_millis(100);
+        println!("Baud rate: {}", settings.baud_rate);
+    } else {
+        eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
+        ::std::process::exit(1);
+    }
+
+    // reopen with new baud rate
+    match serialport::open_with_settings(&port_name, &settings) {
+        Ok(mut port) => {
+            println!("Open port with baud rate {}", settings.baud_rate);
+            
+            println!("Read baud rate");
+            match com::read_baud_rate(&mut port) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+            
+            println!("Read board info");
+            match com::read_info(&mut port) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
                 }
             }
         }

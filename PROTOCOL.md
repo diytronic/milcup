@@ -24,15 +24,16 @@ const DWORD baud[4]= {9600,19200,57600,115200};
 # Check if alive
 
 Write 512 times zero byte
-If unable to read 3 byte back, write 512 of '1'
+Repeat If unable to read 3 byte back
 If unable to read 3 byte back - error
+Else ok
 
 # Set baud rate
 
 const DWORD baud[4]= {9600,19200,57600,115200};
 
 Write 'B<3bytes>0'
-Read while reading something
+Read while reading 1 byte
 
 Write 0xd
 Read 3 bytes 

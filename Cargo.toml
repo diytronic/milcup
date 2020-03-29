@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 structopt = { version = "0.3" }
 serialport = { version = "3.3.0" }
+ihex = { version = "1.1.2" }

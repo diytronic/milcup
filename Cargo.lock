@@ -91,6 +91,11 @@ dependencies = [
 ]
 
 [[package]]
+name = "ihex"
+version = "1.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
 name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -138,6 +143,7 @@ dependencies = [
 name = "mdrup"
 version = "0.1.0"
 dependencies = [
+ "ihex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serialport 3.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -360,6 +366,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)" = "5067f5bb2d80ef5d68b4c87db81601f0b75bca627bc2ef76b141d7b846a3c6d9"
 "checksum heck 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "20564e78d53d2bb135c343b3f47714a56af2061f1c928fdb541dc7b9fdd94205"
 "checksum hermit-abi 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)" = "1010591b26bbfe835e9faeabeb11866061cc7dcebffd56ad7d0942d0e61aefd8"
+"checksum ihex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "9394ec1fbc3afbdfb357ba267a7fffdc39f6e3d8ba88c0af6d9476e6d3c889d5"
 "checksum lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 "checksum libc 0.2.68 (registry+https://github.com/rust-lang/crates.io-index)" = "dea0c0405123bba743ee3f91f49b1c7cfb684eef0da0a50110f758ccf24cdff0"
 "checksum libudev 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ea626d3bdf40a1c5aee3bcd4f40826970cae8d80a8fec934c82a63840094dcfe"

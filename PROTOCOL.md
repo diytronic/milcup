@@ -17,6 +17,8 @@
 	DWORD ThreadId;
 	BOOL fStartRun;
 
+# By default seems working on 9600
+
 const DWORD baud[4]= {9600,19200,57600,115200};
 
 # Check if alive

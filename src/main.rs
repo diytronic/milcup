@@ -11,6 +11,8 @@ use std::io::Read;
 mod hex;
 mod com;
 
+// use com::FlashError;
+
 // Baud rate 
 // 9600,19200,57600,115200
 
@@ -19,7 +21,7 @@ mod com;
 struct Cli {
     // #[structopt(default_value = "auto", short = "p", long = "port")]
     // port_name: String,
-    #[structopt(default_value = "9200", short = "b", long = "baud")]
+    #[structopt(default_value = "9600", short = "b", long = "baud")]
     baud_rate: String,
     #[structopt(parse(from_os_str))]
     path: std::path::PathBuf,
@@ -73,6 +75,9 @@ fn probe_port() -> Result<String, serialport::Error> {
     }
 }
 
+// fn sync() -> Result<(), FlashError> {
+//     Ok(())
+// }
 
 fn main() {
     let args = Cli::from_args();
@@ -112,7 +117,7 @@ fn main() {
 
     // match serialport::open_with_settings(&args.port_name, &settings) {
     match serialport::open_with_settings(&port_name, &settings) {
-        Ok(port) => {
+        Ok(mut port) => {
             // // read firmware file
             // let mut f = File::open(&args.path).expect("no file found");
             // let buf_len = f.metadata().unwrap().len() as usize;
@@ -131,9 +136,14 @@ fn main() {
             // }
             //
             println!("Checking port");
-            match com::check_port(port) {
+            match com::check_port(&mut port) {
                 Ok(_) => println!("ok"),
-                Err(e) =>  eprintln!("{:?}", e),
+                Err(e) => {
+                    match com::check_port(&mut port) {
+                        Ok(_) => println!("ok"),
+                        Err(e) =>  eprintln!("{:?}", e),
+                    }
+                }
             }
         }
         Err(e) => {

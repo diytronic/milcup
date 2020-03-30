@@ -84,23 +84,15 @@ fn main() {
 
     let mut settings: SerialPortSettings = Default::default();
 
-    settings.timeout = Duration::from_millis(3000);
     // 9600,19200,57600,115200
-    settings.baud_rate = 9600;
+    settings.timeout = Duration::from_millis(3000);
+    settings.baud_rate = 9600; // initial baud rate
 
-    // if let Ok(rate) = args.baud_rate.parse::<u32>() {
-    //     settings.baud_rate = rate.into();
-    //     println!("Baud rate: {}", settings.baud_rate);
-    // } else {
-    //     eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
-    //     ::std::process::exit(1);
-    // }
-    //
-    // let hex_file = "1986_BOOT_UART.hex";
+   
     // let hex_file = "LDM-K1986BE92QI_LIGHT.HEX";
     // match hex::read_hex_file(0x80000, std::path::Path::new(hex_file)) {
     //     Ok(hex_file) => {
-    //         println!("Hex buffer length {}", hex_file.buffer.len());
+    //         println!("Hex buffer length {}", hex_file.buf.len());
     //     },
     //     Err(error) => {
     //         eprintln!("Error: '{}'", error);
@@ -138,7 +130,7 @@ fn main() {
             if let Ok(rate) = args.baud_rate.parse::<u32>() {
                 println!("Set baud rate {}", rate);
                 match com::set_baud_rate(&mut port, rate) {
-                    Ok(_) => println!("ok"),
+                    Ok(_) => println!("ok baud rate set success"),
                     Err(e) => {
                         eprintln!("{:?}", e);
                         ::std::process::exit(1);
@@ -157,7 +149,7 @@ fn main() {
 
     if let Ok(rate) = args.baud_rate.parse::<u32>() {
         settings.baud_rate = rate.into();
-        settings.timeout = Duration::from_millis(100);
+        // settings.timeout = Duration::from_millis(3000);
         println!("Baud rate: {}", settings.baud_rate);
     } else {
         eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
@@ -177,10 +169,31 @@ fn main() {
                     ::std::process::exit(1);
                 }
             }
-            
+
+            println!("Boot load");
+
+            let hex_file = "1986_BOOT_UART.hex";
+            match hex::read_hex_file(std::path::Path::new(hex_file)) {
+                Ok(hex_file) => {
+                    println!("Hex buffer length {}", hex_file.buf.len());
+
+                    match com::boot_load(&mut port, hex_file) {
+                        Ok(_) => println!("ok"),
+                        Err(e) => {
+                            eprintln!("{:?}", e);
+                            ::std::process::exit(1);
+                        }
+                    }
+                },
+                Err(error) => {
+                    eprintln!("Error: '{}'", error);
+                    ::std::process::exit(1);
+                }
+            };
+
             println!("Read board info");
             match com::read_info(&mut port) {
-                Ok(_) => println!("ok"),
+                Ok(str) => println!("ok {}", str),
                 Err(e) => {
                     eprintln!("{:?}", e);
                     ::std::process::exit(1);

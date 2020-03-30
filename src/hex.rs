@@ -11,19 +11,18 @@ use ihex::{
 };
 
 pub struct HexFile {
-    pub dwadrbot: u32,
-    pub ilboot: u32,
-    pub size: usize,
-    pub buffer: Vec<u8>
+    pub addr: u32,
+    pub size: u32,
+    pub buf: Vec<u8>
 }
 
-pub fn read_hex_file(max_size: usize, filename: &Path) -> Result<HexFile, String> {
+pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     let data = fs::read_to_string(filename).expect("no such file");
     let mut reader = Reader::new(&data);
 
     // check addresses
     reader = Reader::new(&data);
-    let file_base_addr = reader.fold(0, |curr_addr, rec| 
+    let base_addr : u16 = reader.fold(0, |curr_addr, rec| 
         match rec {
             Ok(Record::ExtendedLinearAddress(addr)) => curr_addr + addr,
             Ok(Record::ExtendedSegmentAddress(addr)) => curr_addr + addr,
@@ -31,32 +30,60 @@ pub fn read_hex_file(max_size: usize, filename: &Path) -> Result<HexFile, String
         }
     );
 
-    // file max addr
+    // file base addr
     reader = Reader::new(&data);
-    let file_max_offset = reader.fold(0, |curr_offset, rec| 
+    let data_addr : u16 = reader.filter(|rec| 
         match rec {
-            Ok(Record::Data {offset, value}) => cmp::max(offset, curr_offset),
-            _ => curr_offset,
+            Ok(Record::Data {offset, value}) => true,
+            _ => false
         }
-    );
+    ).take(1).map(|rec| 
+        match rec {
+            Ok(Record::Data {offset, value}) => offset,
+            _ => 0
+        }
+    ).last().unwrap();
+
+    // // file max addr
+    // reader = Reader::new(&data);
+    // let file_max_offset = reader.fold(0, |curr_offset, rec| 
+    //     match rec {
+    //         Ok(Record::Data {offset, value}) => cmp::max(offset, curr_offset),
+    //         _ => curr_offset,
+    //     }
+    // );
 
     // file max addr
     reader = Reader::new(&data);
-    let file_data_len = reader.fold(0, |curr_len, rec| 
+    let data_size : u32 = reader.fold(0u32, |curr_len, rec| 
         match rec {
-            Ok(Record::Data {offset, value}) => value.len() + curr_len,
+            Ok(Record::Data {offset, value}) => (value.len() as u32) + curr_len,
             _ => curr_len,
         }
     );
 
-    println!(" Write addr: 0x{:0>6X?}", file_base_addr);
-    println!("   Max addr: 0x{:0>6X?}", file_max_offset);
-    println!("Data length: 0x{:0>6X?}", file_data_len);
-    println!("Max  length: 0x{:0>6X?}", max_size);
+    println!("  Base addr: 0x{:0>6X?}", base_addr);
+    println!("  Data addr: 0x{:0>6X?}", data_addr);
+    // println!("   Max addr: 0x{:0>6X?}", file_max_offset);
+    println!("Data length: 0x{:0>6X?}", data_size);
+    println!("           0x08000000");
+    println!("           0x20000000");
 
-    if file_data_len > max_size {
-        return Err("Oversize".to_string());
-    }
+    // if file_data_len > max_size {
+    //     return Err("Oversize".to_string());
+    // }
+    //
+    // data
+    reader = Reader::new(&data);
+    let file_data = reader.fold(Vec::<u8>::new(), |mut data, rec| 
+        match rec {
+            Ok(Record::Data {offset, mut value}) => {
+                data.append(&mut value);
+                data
+            },
+            _ => data,
+        }
+    );
 
     reader = Reader::new(&data);
     let x = reader.map(|r| 
@@ -72,7 +99,7 @@ pub fn read_hex_file(max_size: usize, filename: &Path) -> Result<HexFile, String
         }
     );
 
-         println!("Reader count: {}", x.count());
+    println!("Reader count: {}", x.count());
 
     // let lines = buf
     //     .lines()
@@ -82,12 +109,17 @@ pub fn read_hex_file(max_size: usize, filename: &Path) -> Result<HexFile, String
     //
     // println!("Lines: {}", lines.join("\n"));
 
+    let base_addr_buf = base_addr.to_be_bytes();
+    let data_addr_buf = data_addr.to_be_bytes();
+    let addr_buf : [u8; 4] = [base_addr_buf[0], base_addr_buf[1], data_addr_buf[0], data_addr_buf[1]];
+
     let hex_file = HexFile {
-        dwadrbot: 1,
-        ilboot: 2,
-        size: file_data_len,
-        buffer: vec![1, 2, 3],
+        addr: u32::from_be_bytes(addr_buf),
+        size: data_size,
+        buf: file_data,
     };
+
+    println!("Load addr: 0x{:0>6X?}", hex_file.addr);
 
     return Ok(hex_file);
 }

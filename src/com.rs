@@ -29,6 +29,10 @@ impl From<io::Error> for FlashError {
     }
 }
 
+/// Function to check if port alive
+///
+/// Send 512 zero bytes and check if port answer
+///
 pub fn check_port(port: &mut Box<dyn SerialPort>) -> Result<(), FlashError> {
     write_buf(port, vec![0; 512])?; // write 512 zero bytes
     read_buf(port, 3)?; // try to read 3 ones
@@ -36,6 +40,12 @@ pub fn check_port(port: &mut Box<dyn SerialPort>) -> Result<(), FlashError> {
     return Ok(());
 }
 
+/// Set UART baud rate 
+///
+/// Initial connection happens on speed of 9600 so we can setup better
+/// baud rate with this function.
+///
+/// After success reconnect required with given baud rate
 pub fn set_baud_rate(port: &mut Box<dyn SerialPort>, baud_rate: u32) -> Result<(), FlashError> {
     // write 'B' b1 b2 b3 0x0
     // where b1 low byte of baud rate 
@@ -65,8 +75,13 @@ pub fn read_baud_rate(port: &mut Box<dyn SerialPort>) -> Result<Vec<u8>, FlashEr
     return Ok(resp);
 }
 
-// dwadrboot: address
-// ilboot: size
+/// Load UART boot loader
+///
+/// Custom boot loader loaded into RAM to provide additional capabilities
+/// of loading real program code to flash memory
+///
+/// Boot loader uploaded to base address 0x20000000
+///
 pub fn boot_load(port: &mut Box<dyn SerialPort>, data: crate::hex::HexFile) -> Result<(), FlashError> {
     println!("Writing boot code to {:0>8X?}", data.addr);
     println!("Data size is {} bytes", data.size);

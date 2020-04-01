@@ -1,22 +1,22 @@
+/// Board interface commands
+///
 use std::{
     io::{
         self, 
-        // Write,  
-        // prelude::*, 
-        // BufReader,
         Error,
         ErrorKind,
     },
-    // time::Duration,
-    // boxed::Box,
 };
 
-use crate::hex::HexFile;
-
-use crate::com_port::{
-    ComPortError,
-    ComPortMethods,
-    ComPort
+use crate::{
+    com_port::{
+        ComPortError,
+        ComPortMethods,
+        ComPort
+    },
+    hex:: {
+        HexFile
+    }
 };
 
 #[derive(Debug)]
@@ -37,7 +37,7 @@ impl From<ComPortError> for FlashError {
     }
 }
 
-/// Function to check if port alive
+/// Check if com port alive
 ///
 /// Send 512 zero bytes and check if port answer
 ///
@@ -79,7 +79,7 @@ pub fn read_baud_rate(port: &mut ComPort) -> Result<Vec<u8>, FlashError> {
     return Ok(resp);
 }
 
-/// Load UART boot loader
+/// Upload UART boot loader to board RAM
 ///
 /// Custom boot loader loaded into RAM to provide additional capabilities
 /// of loading real program code to flash memory
@@ -90,15 +90,15 @@ pub fn boot_load(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
     println!("Writing boot code to {:0>8X?}", data.addr);
     println!("Data size is {} bytes", data.size);
 
+    // set address where to put boot loader
     port.write_str("L")?;
     port.write_u32(data.addr)?; // address to load code to 
     port.write_u32(data.size)?; // size of data
-
     if port.read_str(1)? != "L" {
         return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error setting baud rate")));
     }
 
-    // write boot loader code 1986_BOOT_UART.hex
+    // write boot loader code file 1986_BOOT_UART.hex
     port.write_buf(data.buf)?;
     if port.read_str(1)? != "K" {
         return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error writing boot code")));
@@ -119,7 +119,6 @@ pub fn boot_load(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
     port.write_str("R")?;
     port.write_u32(data.addr)?; // address to load code to 
     port.write_u32(data.size)?; // size of data
-
     if port.read_str(1)? != "R" {
         return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error running boot code")));
     }
@@ -127,6 +126,11 @@ pub fn boot_load(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
     return Ok(());
 }
 
+/// Read boot loader info 
+///
+/// Really this is a last 12 bytes of boot loader
+/// Normally it should return 1986BOOTUART string
+///
 pub fn read_info(port: &mut ComPort) -> Result<String, FlashError> {
     port.write_str("I")?;
     let res = port.read_str(12)?;

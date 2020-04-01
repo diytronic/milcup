@@ -2,14 +2,15 @@ use structopt::StructOpt;
 use serialport::prelude::*;
 use serialport::SerialPortType;
 use std::time::Duration;
-use std::io::{self, Write};
+// use std::io::{self, Write};
 // use std::fs;
 // use std::env;
-use std::fs::File;
-use std::io::Read;
+// use std::fs::File;
+// use std::io::Read;
 
 mod hex;
 mod com;
+mod com_port;
 
 // use com::FlashError;
 

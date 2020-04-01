@@ -1,7 +1,10 @@
 use std::{
     fs,
-    cmp,
-    io::{prelude::*, BufReader},
+    // cmp,
+    // io::{
+    //     // prelude::*, 
+    //     // BufReader
+    // },
     path::Path,
 };
 
@@ -18,10 +21,9 @@ pub struct HexFile {
 
 pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     let data = fs::read_to_string(filename).expect("no such file");
-    let mut reader = Reader::new(&data);
 
     // check addresses
-    reader = Reader::new(&data);
+    let mut reader = Reader::new(&data);
     let base_addr : u16 = reader.fold(0, |curr_addr, rec| 
         match rec {
             Ok(Record::ExtendedLinearAddress(addr)) => curr_addr + addr,
@@ -34,12 +36,12 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     reader = Reader::new(&data);
     let data_addr : u16 = reader.filter(|rec| 
         match rec {
-            Ok(Record::Data {offset, value}) => true,
+            Ok(Record::Data {offset: _, value: _}) => true,
             _ => false
         }
     ).take(1).map(|rec| 
         match rec {
-            Ok(Record::Data {offset, value}) => offset,
+            Ok(Record::Data {offset, value: _}) => offset,
             _ => 0
         }
     ).last().unwrap();
@@ -57,7 +59,7 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     reader = Reader::new(&data);
     let data_size : u32 = reader.fold(0u32, |curr_len, rec| 
         match rec {
-            Ok(Record::Data {offset, value}) => (value.len() as u32) + curr_len,
+            Ok(Record::Data {offset: _, value}) => (value.len() as u32) + curr_len,
             _ => curr_len,
         }
     );
@@ -77,7 +79,7 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     reader = Reader::new(&data);
     let file_data = reader.fold(Vec::<u8>::new(), |mut data, rec| 
         match rec {
-            Ok(Record::Data {offset, mut value}) => {
+            Ok(Record::Data {offset: _, mut value}) => {
                 data.append(&mut value);
                 data
             },
@@ -94,7 +96,7 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
             Ok(Record::ExtendedSegmentAddress(addr)) => println!("Extended segment address: 0x{:X?}", addr),
             Ok(Record::StartSegmentAddress {cs, ip}) => println!("Start segment address: {} {}", cs, ip),
             Ok(Record::EndOfFile) => println!("END"),
-            Ok(rec) => eprintln!("Unknown record"),
+            // Ok(_) => eprintln!("Unknown record"),
             Err(err) => eprintln!("{}", err)
         }
     );

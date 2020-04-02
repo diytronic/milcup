@@ -140,18 +140,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "mdrup"
-version = "0.1.0"
+name = "memchr"
+version = "2.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "milcup"
+version = "0.0.1"
 dependencies = [
  "ihex 1.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "serialport 3.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "structopt 0.3.12 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
-
-[[package]]
-name = "memchr"
-version = "2.3.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "nix"

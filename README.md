@@ -1,3 +1,3 @@
-# mdrup
+# milcup
 
-MilanDR UPloader
+MILandr Code UPloader

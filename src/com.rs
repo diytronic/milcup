@@ -137,3 +137,26 @@ pub fn read_info(port: &mut ComPort) -> Result<String, FlashError> {
 
     return Ok(res);
 }
+
+/// Erase
+///
+/// Full chip erase
+///
+pub fn erase(port: &mut ComPort) -> Result<(), FlashError> {
+    // set address where to put boot loader
+    port.write_str("E")?;
+    // pause 1000
+    if port.read_str(1)? != "E" {
+        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error setting baud rate")));
+    }
+
+    let addr = port.read_u32()?;
+    let data = port.read_u32()?;
+
+    if (addr == 0x08020000) && (data == 0xffffffff) {
+        return Ok(());
+    } else {
+        return Err(FlashError::Io(Error::new(ErrorKind::Other, format!("Chip erase fail addr=0x{:0>4X?} data={:0>4X?}", addr, data))));
+    }
+}
+

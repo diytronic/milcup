@@ -35,6 +35,7 @@ pub trait ComPortMethods {
     fn write_u32(&mut self, buf: u32) -> Result<(), ComPortError>;
     fn read_buf(&mut self, len: usize) -> Result<Vec<u8>, ComPortError>;
     fn read_str(&mut self, len: usize) -> Result<String, ComPortError>;
+    fn read_u32(&mut self) -> Result<u32, ComPortError>;
 }
 
 impl ComPortMethods for ComPort {
@@ -64,6 +65,11 @@ impl ComPortMethods for ComPort {
     fn read_str(&mut self, len: usize) -> Result<String, ComPortError> {
         let res = self.read_buf(len)?;
         return Ok(String::from_utf8_lossy(&res).to_string());
+    }
+
+    fn read_u32(&mut self) -> Result<u32, ComPortError> {
+        let res = self.read_buf(4)?;
+        return Ok(u32::from_le_bytes([res[0], res[1], res[2], res[3]]));
     }
 }
 

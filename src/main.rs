@@ -200,6 +200,12 @@ fn main() {
                     ::std::process::exit(1);
                 }
             }
+
+            // Erase
+            
+            // Program
+            
+            // Verify
         }
         Err(e) => {
             eprintln!("Failed to open \"{}\". Error: {}", port_name, e);

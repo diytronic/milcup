@@ -173,7 +173,7 @@ fn main() {
 
             println!("Boot load");
 
-            let hex_file = "1986_BOOT_UART.hex";
+            let hex_file = "firmware/1986_BOOT_UART.hex";
             match hex::read_hex_file(std::path::Path::new(hex_file)) {
                 Ok(hex_file) => {
                     println!("Hex buffer length {}", hex_file.buf.len());
@@ -202,9 +202,35 @@ fn main() {
             }
 
             // Erase
+            println!("Erase chip");
+            match com::erase(&mut port) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
             
             // Program
-            
+            println!("Proram chip");
+            match hex::read_hex_file(std::path::Path::new(&args.path)) {
+                Ok(hex_file) => {
+                    println!("Hex buffer length {}", hex_file.buf.len());
+
+                    match com::program(&mut port, hex_file) {
+                        Ok(_) => println!("ok"),
+                        Err(e) => {
+                            eprintln!("{:?}", e);
+                            ::std::process::exit(1);
+                        }
+                    }
+                },
+                Err(error) => {
+                    eprintln!("Error: '{}'", error);
+                    ::std::process::exit(1);
+                }
+            };
+
             // Verify
         }
         Err(e) => {

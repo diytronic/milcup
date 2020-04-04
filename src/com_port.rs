@@ -36,11 +36,13 @@ pub trait ComPortMethods {
     fn read_buf(&mut self, len: usize) -> Result<Vec<u8>, ComPortError>;
     fn read_str(&mut self, len: usize) -> Result<String, ComPortError>;
     fn read_u32(&mut self) -> Result<u32, ComPortError>;
+    fn read_byte(&mut self) -> Result<u8, ComPortError>;
 }
 
 impl ComPortMethods for ComPort {
     fn write_buf(&mut self, buf: Vec<u8>) -> Result<(), ComPortError> {
-        println!("Write buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
+        // println!("Write buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
+        println!("Write buf: {:0>2X?}", buf);
         self.write(&buf)?;
         std::io::stdout().flush().unwrap();
         return Ok(());
@@ -58,7 +60,8 @@ impl ComPortMethods for ComPort {
         let mut buf: Vec<u8> = vec![0; len];
         self.read(buf.as_mut_slice())?;
         // println!("Read buf: {:0>2X?} {}", buf, std::str::from_utf8_unchecked(&buf));
-        println!("Read buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
+        // println!("Read buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
+        println!("Read buf: {:0>2X?}", buf);
         return Ok(buf);
     }
 
@@ -70,6 +73,11 @@ impl ComPortMethods for ComPort {
     fn read_u32(&mut self) -> Result<u32, ComPortError> {
         let res = self.read_buf(4)?;
         return Ok(u32::from_le_bytes([res[0], res[1], res[2], res[3]]));
+    }
+
+    fn read_byte(&mut self) -> Result<u8, ComPortError> {
+        let res = self.read_buf(1)?;
+        return Ok(res[0]);
     }
 }
 

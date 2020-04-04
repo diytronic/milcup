@@ -9,10 +9,10 @@ use std::time::Duration;
 // use std::io::Read;
 
 mod hex;
-mod com;
+mod command;
 mod com_port;
 
-// use com::FlashError;
+// use command::FlashError;
 
 // Baud rate 
 // 9600,19200,57600,115200
@@ -120,7 +120,7 @@ fn main() {
             // f.read(&mut buffer).expect("buffer overflow");
             //
             println!("Checking port");
-            match com::check_port(&mut port) {
+            match command::check_port(&mut port) {
                 Ok(_) => println!("ok"),
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -130,7 +130,7 @@ fn main() {
 
             if let Ok(rate) = args.baud_rate.parse::<u32>() {
                 println!("Set baud rate {}", rate);
-                match com::set_baud_rate(&mut port, rate) {
+                match command::set_baud_rate(&mut port, rate) {
                     Ok(_) => println!("ok baud rate set success"),
                     Err(e) => {
                         eprintln!("{:?}", e);
@@ -163,7 +163,7 @@ fn main() {
             println!("Open port with baud rate {}", settings.baud_rate);
             
             println!("Read baud rate");
-            match com::read_baud_rate(&mut port) {
+            match command::read_baud_rate(&mut port) {
                 Ok(_) => println!("ok"),
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -178,7 +178,7 @@ fn main() {
                 Ok(hex_file) => {
                     println!("Hex buffer length {}", hex_file.buf.len());
 
-                    match com::boot_load(&mut port, hex_file) {
+                    match command::boot_load(&mut port, hex_file) {
                         Ok(_) => println!("ok"),
                         Err(e) => {
                             eprintln!("{:?}", e);
@@ -193,7 +193,7 @@ fn main() {
             };
 
             println!("Read board info");
-            match com::read_info(&mut port) {
+            match command::read_info(&mut port) {
                 Ok(str) => println!("ok {}", str),
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -203,7 +203,7 @@ fn main() {
 
             // Erase
             println!("Erase chip");
-            match com::erase(&mut port) {
+            match command::erase(&mut port) {
                 Ok(_) => println!("ok"),
                 Err(e) => {
                     eprintln!("{:?}", e);
@@ -212,12 +212,22 @@ fn main() {
             }
             
             // Program
-            println!("Proram chip");
+            println!("Program chip");
             match hex::read_hex_file(std::path::Path::new(&args.path)) {
                 Ok(hex_file) => {
                     println!("Hex buffer length {}", hex_file.buf.len());
 
-                    match com::program(&mut port, hex_file) {
+                    match command::program(&mut port, &hex_file) {
+                        Ok(_) => println!("ok"),
+                        Err(e) => {
+                            eprintln!("{:?}", e);
+                            ::std::process::exit(1);
+                        }
+                    }
+
+                    // Verify
+                    println!("Verify chip");
+                    match command::verify(&mut port, &hex_file) {
                         Ok(_) => println!("ok"),
                         Err(e) => {
                             eprintln!("{:?}", e);
@@ -231,7 +241,6 @@ fn main() {
                 }
             };
 
-            // Verify
         }
         Err(e) => {
             eprintln!("Failed to open \"{}\". Error: {}", port_name, e);

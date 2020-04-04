@@ -8,11 +8,17 @@ use std::time::Duration;
 // use std::fs::File;
 // use std::io::Read;
 
+use std::{
+    io::{
+        self, 
+        Error,
+        ErrorKind,
+    },
+};
+
 mod hex;
 mod command;
 mod com_port;
-
-// use command::FlashError;
 
 // Baud rate 
 // 9600,19200,57600,115200
@@ -20,231 +26,166 @@ mod com_port;
 #[derive(StructOpt)]
 #[structopt(about = "Milandr 1986 firmware uploader", rename_all = "kebab-case")]
 struct Cli {
-    // #[structopt(default_value = "auto", short = "p", long = "port")]
-    // port_name: String,
+    #[structopt(default_value = "auto", short = "p", long = "port")]
+    port_name: String,
     #[structopt(default_value = "115200", short = "b", long = "baud")]
-    baud_rate: String,
+    baud_rate: u32,
+    // #[structopt(default_value = true, short = "p", long = "program")]
+    // program: bool,
+    // #[structopt(default_value = true, short = "e", long = "erase")]
+    // erase: bool,
+    // #[structopt(default_value = true, short = "v", long = "verify")]
+    // verify: bool,
     #[structopt(parse(from_os_str))]
     path: std::path::PathBuf,
 }
 
-fn probe_port() -> Result<String, serialport::Error> {
-    match serialport::available_ports() {
-        Ok(ports) => {
-            let mdr_ports = ports
-                .into_iter()
-                .filter(|port| match &port.port_type {
-                    SerialPortType::UsbPort(info) => {
-                        println!("    Type: USB");
-                        println!("    VID:{:04x} PID:{:04x}", info.vid, info.pid);
-                        println!(
-                            "     Serial Number: {}",
-                            info.serial_number.as_ref().map_or("", String::as_str)
-                        );
-                        println!(
-                            "      Manufacturer: {}",
-                            info.manufacturer.as_ref().map_or("", String::as_str)
-                        );
-                        println!(
-                            "           Product: {}",
-                            info.product.as_ref().map_or("", String::as_str)
-                        );
-                        true
-                    },
-                    _ => false
-                }) 
-                .collect::<Vec<SerialPortInfo>>();
 
-            match mdr_ports.len() {
-                0 => { 
-                    return Err(serialport::Error::new( serialport::ErrorKind::Unknown, "No ports found")); 
-                },
-                1 => {
-                    return Ok(mdr_ports.last().unwrap().port_name.clone())
-                },
-                n => {
-                    println!("Found {} ports:", n);
-                    return Err(serialport::Error::new( serialport::ErrorKind::Unknown, "open() not implemented for platform")); 
-                }
-            };
-        }
-        Err(e) => {
-            eprintln!("{:?}", e);
-            eprintln!("Error listing serial ports");
-            return Err(e)
-        }
+impl From<command::FlashError> for std::io::Error {
+    fn from(err : command::FlashError) -> std::io::Error {
+        return Error::new(ErrorKind::Other, "Command error");
     }
 }
 
-// fn sync() -> Result<(), FlashError> {
-//     Ok(())
-// }
+/// Try to find available port automatically
+///
+/// Rule is pretty simple - if we have a single USB-COM port - use it.
+/// In other cases - no ports available or more than 1 port - cause an error and prompt
+/// to specify port explicitly
+///
+fn probe_port() -> Result<String, serialport::Error> {
+    let ports = serialport::available_ports()?;
+    let mdr_ports = ports // we need only USB-COM ports
+        .into_iter()
+        .filter(|port| match &port.port_type {
+            SerialPortType::UsbPort(info) => {
+                println!("    Type: USB");
+                println!("    VID:{:04x} PID:{:04x}", info.vid, info.pid);
+                println!( "     Serial Number: {}",
+                    info.serial_number.as_ref().map_or("", String::as_str)
+                );
+                println!( "      Manufacturer: {}",
+                    info.manufacturer.as_ref().map_or("", String::as_str)
+                );
+                println!( "           Product: {}",
+                    info.product.as_ref().map_or("", String::as_str)
+                );
+                true
+            },
+            _ => false
+        }) 
+        .collect::<Vec<SerialPortInfo>>();
 
-fn main() {
+    return match mdr_ports.len() {
+        0 => Err(serialport::Error::new(serialport::ErrorKind::Unknown, "No ports found")),
+        1 => Ok(mdr_ports.last().unwrap().port_name.clone()),
+        n => Err(serialport::Error::new( serialport::ErrorKind::Unknown, "open() not implemented for platform"))
+    };
+}
+
+fn main() -> Result<(), std::io::Error> {
     let args = Cli::from_args();
 
     let mut settings: SerialPortSettings = Default::default();
-
-    // 9600,19200,57600,115200
     settings.timeout = Duration::from_millis(3000);
     settings.baud_rate = 9600; // initial baud rate
-
-   
-    // let hex_file = "LDM-K1986BE92QI_LIGHT.HEX";
-    // match hex::read_hex_file(0x80000, std::path::Path::new(hex_file)) {
-    //     Ok(hex_file) => {
-    //         println!("Hex buffer length {}", hex_file.buf.len());
-    //     },
-    //     Err(error) => {
-    //         eprintln!("Error: '{}'", error);
-    //         ::std::process::exit(1);
-    //     }
-    // };
     
-    // try to discover port
-    let port_name = match probe_port() {
-        Ok(name) => name,
+    let port_name = if args.port_name == "auto" {
+        probe_port()?
+    } else {
+        args.port_name
+    };
+
+    println!("Discovered port {}", port_name);
+
+    let mut port = serialport::open_with_settings(&port_name, &settings)?;
+
+    println!("Checking port");
+    command::check_port(&mut port)?;
+
+    println!("Set baud rate {}", args.baud_rate);
+    command::set_baud_rate(&mut port, args.baud_rate);
+
+    std::mem::drop(port);
+
+    settings.baud_rate = args.baud_rate;
+
+    // reopen with new baud rate
+    let mut port = serialport::open_with_settings(&port_name, &settings)?;
+    println!("Open port with baud rate {}", settings.baud_rate);
+
+    println!("Read baud rate");
+    command::read_baud_rate(&mut port)?;
+
+    println!("Boot load");
+
+    let hex_file = "firmware/1986_BOOT_UART.hex";
+    match hex::read_hex_file(std::path::Path::new(hex_file)) {
+        Ok(hex_file) => {
+            println!("Hex buffer length {}", hex_file.buf.len());
+
+            match command::boot_load(&mut port, hex_file) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+        },
         Err(error) => {
             eprintln!("Error: '{}'", error);
             ::std::process::exit(1);
         }
     };
 
-    // match serialport::open_with_settings(&args.port_name, &settings) {
-    match serialport::open_with_settings(&port_name, &settings) {
-        Ok(mut port) => {
-            // // read firmware file
-            // let mut f = File::open(&args.path).expect("no file found");
-            // let buf_len = f.metadata().unwrap().len() as usize;
-            // let mut buffer = vec![0; buf_len];
-            // f.read(&mut buffer).expect("buffer overflow");
-            //
-            println!("Checking port");
-            match command::check_port(&mut port) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-
-            if let Ok(rate) = args.baud_rate.parse::<u32>() {
-                println!("Set baud rate {}", rate);
-                match command::set_baud_rate(&mut port, rate) {
-                    Ok(_) => println!("ok baud rate set success"),
-                    Err(e) => {
-                        eprintln!("{:?}", e);
-                        ::std::process::exit(1);
-                    }
-                }
-            } else {
-                eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
-                ::std::process::exit(1);
-            }
-        }
+    println!("Read board info");
+    match command::read_info(&mut port) {
+        Ok(str) => println!("ok {}", str),
         Err(e) => {
-            eprintln!("Failed to open \"{}\". Error: {}", port_name, e);
+            eprintln!("{:?}", e);
             ::std::process::exit(1);
         }
     }
 
-    if let Ok(rate) = args.baud_rate.parse::<u32>() {
-        settings.baud_rate = rate.into();
-        // settings.timeout = Duration::from_millis(3000);
-        println!("Baud rate: {}", settings.baud_rate);
-    } else {
-        eprintln!("Error: Invalid baud rate '{}' specified", args.baud_rate);
-        ::std::process::exit(1);
-    }
-
-    // reopen with new baud rate
-    match serialport::open_with_settings(&port_name, &settings) {
-        Ok(mut port) => {
-            println!("Open port with baud rate {}", settings.baud_rate);
-            
-            println!("Read baud rate");
-            match command::read_baud_rate(&mut port) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-
-            println!("Boot load");
-
-            let hex_file = "firmware/1986_BOOT_UART.hex";
-            match hex::read_hex_file(std::path::Path::new(hex_file)) {
-                Ok(hex_file) => {
-                    println!("Hex buffer length {}", hex_file.buf.len());
-
-                    match command::boot_load(&mut port, hex_file) {
-                        Ok(_) => println!("ok"),
-                        Err(e) => {
-                            eprintln!("{:?}", e);
-                            ::std::process::exit(1);
-                        }
-                    }
-                },
-                Err(error) => {
-                    eprintln!("Error: '{}'", error);
-                    ::std::process::exit(1);
-                }
-            };
-
-            println!("Read board info");
-            match command::read_info(&mut port) {
-                Ok(str) => println!("ok {}", str),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-
-            // Erase
-            println!("Erase chip");
-            match command::erase(&mut port) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-            
-            // Program
-            println!("Program chip");
-            match hex::read_hex_file(std::path::Path::new(&args.path)) {
-                Ok(hex_file) => {
-                    println!("Hex buffer length {}", hex_file.buf.len());
-
-                    match command::program(&mut port, &hex_file) {
-                        Ok(_) => println!("ok"),
-                        Err(e) => {
-                            eprintln!("{:?}", e);
-                            ::std::process::exit(1);
-                        }
-                    }
-
-                    // Verify
-                    println!("Verify chip");
-                    match command::verify(&mut port, &hex_file) {
-                        Ok(_) => println!("ok"),
-                        Err(e) => {
-                            eprintln!("{:?}", e);
-                            ::std::process::exit(1);
-                        }
-                    }
-                },
-                Err(error) => {
-                    eprintln!("Error: '{}'", error);
-                    ::std::process::exit(1);
-                }
-            };
-
-        }
+    // Erase
+    println!("Erase chip");
+    match command::erase(&mut port) {
+        Ok(_) => println!("ok"),
         Err(e) => {
-            eprintln!("Failed to open \"{}\". Error: {}", port_name, e);
+            eprintln!("{:?}", e);
             ::std::process::exit(1);
         }
     }
+
+    // Program
+    println!("Program chip");
+    match hex::read_hex_file(std::path::Path::new(&args.path)) {
+        Ok(hex_file) => {
+            println!("Hex buffer length {}", hex_file.buf.len());
+
+            match command::program(&mut port, &hex_file) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+
+            // Verify
+            println!("Verify chip");
+            match command::verify(&mut port, &hex_file) {
+                Ok(_) => println!("ok"),
+                Err(e) => {
+                    eprintln!("{:?}", e);
+                    ::std::process::exit(1);
+                }
+            }
+        },
+        Err(error) => {
+            eprintln!("Error: '{}'", error);
+            ::std::process::exit(1);
+        }
+    };
+
+    return Ok(());
 }

@@ -162,7 +162,7 @@ pub fn erase(port: &mut ComPort) -> Result<(), FlashError> {
 
 /// Upload real firmware to flash
 ///
-pub fn program(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
+pub fn program(port: &mut ComPort, data: &HexFile) -> Result<(), FlashError> {
     println!("Writing program code to {:0>8X?}", data.addr);
     println!("Data size is {} bytes", data.size);
 
@@ -170,7 +170,7 @@ pub fn program(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
     port.write_str("A")?;
     port.write_u32(data.addr)?; // address to load code to 
     if port.read_byte()? != 0x08 {
-        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error sending A command")));
+        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error setting flash address")));
     }
 
     // write code by 256 byte length chunks
@@ -182,21 +182,33 @@ pub fn program(port: &mut ComPort, data: HexFile) -> Result<(), FlashError> {
           res
         }
     } {};
-
-    //
-    // // read and compare
-    // // TODO: read and check throught all the data
-    // port.write_str("Y")?;
-    // port.write_u32(data.addr)?;  // address to load code to 
-    // port.write_u32(0x8u32)?;     // not sure what is it
-    //
-    // let resp = port.read_buf(10)?; 
-    // if resp[0] != ('Y' as u8) && resp[9] != ('K' as u8) {
-    //     return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error reading written code")));
-    // }
     
     return Ok(());
 }
+
+/// Verify uploaded firmware
+///
+pub fn verify(port: &mut ComPort, data: &HexFile) -> Result<(), FlashError> {
+    // set address where to put program
+    port.write_str("A")?;
+    port.write_u32(data.addr)?; // address to load code to 
+    if port.read_byte()? != 0x08 {
+        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error setting flash address")));
+    }
+
+    // write code by 256 byte length chunks
+    let mut iter = data.buf.chunks(256);
+    while match iter.next() { 
+        None => false,
+        Some(wbuf) => {
+          let res =  verify_program_chunk(port, wbuf)?;
+          res
+        }
+    } {};
+    
+    return Ok(());
+}
+
 
 /// calculate checksum of data chunk
 ///
@@ -207,24 +219,50 @@ fn checksum(buf : &[u8]) -> u8 {
 }
 
 fn write_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, FlashError>  {
-    println!("Writing chunk");
-    port.write_str("P")?;
-    port.write_buf(buf.to_vec())?;
-
     // if not a full 256 bytes buffer - fill the rest with 0xFF
-    let diff = 256 - buf.len();
+    let mut wbuf = buf.to_vec().clone();
+
+    let diff = 256 - buf.len(); // number of bytes up to 256
     if diff > 0 {
-        println!("Write rest {} of bytes", diff);
-        port.write_buf(vec![0x00; diff])?;
+        println!("Add {} of bytes up to 256", diff);
+        wbuf.append(&mut vec![0x00; diff]);
     }
 
-    let sum : u8 = checksum(buf);
-    let rsum : u8 = port.read_byte()?; 
+    println!("Writing chunk");
+    port.write_str("P")?;
+    port.write_buf(wbuf.to_vec())?;
+
+    let sum : u8 = checksum(&wbuf);    // calcuate by written data
+    let rsum : u8 = port.read_byte()?; // return from UART
 
     println!("Checking control sum {:0>2X?} == {:0>2X?}", sum, rsum);
     if rsum != sum {
-        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error control sum")));
+        return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error checking control sum")));
     }
+
+    Ok(true)
+}
+
+fn verify_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, FlashError>  {
+    println!("Verify chunk");
+    
+    // check 32 chunks of 8 bytes blocks
+    let mut iter = buf.chunks(8);
+    while match iter.next() { 
+        None => false,
+        Some(vbuf) => {
+            port.write_str("V")?;
+            let rbuf = port.read_buf(8)?;
+            println!("Verify {:0>2X?} == {:0>2X?}", rbuf, vbuf);
+
+            let buf_len = vbuf.len();
+            if rbuf[0..buf_len] != vbuf[0..buf_len] {
+                return Err(FlashError::Io(Error::new(ErrorKind::Other, "Error verify block")));
+            }
+
+            true
+        }
+    } {};
 
     Ok(true)
 }

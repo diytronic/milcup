@@ -1,6 +1,10 @@
 use std::{
     fs,
+    fmt,
     path::Path,
+    io::{
+        self,
+    },
 };
 
 use ihex::{
@@ -14,11 +18,42 @@ pub struct HexFile {
     pub buf: Vec<u8>
 }
 
-pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
-    let data = fs::read_to_string(filename).expect("no such file");
+#[derive(Debug)]
+pub enum Error {
+    Io(io::Error),
+}
 
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref err) => err.fmt(f),
+            // CliError::NotFound => write!(f, "No matching cities with a \
+            //                                  population were found."),
+        }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(err: std::io::Error) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<Error> for std::io::Error {
+    fn from(err : Error) -> std::io::Error {
+        return std::io::Error::new(std::io::ErrorKind::Other, "Firmware Error");
+    }
+}
+
+pub fn read_hex_file(filename: &Path) -> Result<HexFile, Error> {
+    let data = fs::read_to_string(filename).expect("no such file");
+    let firmware = parse_hex_buffer(&data)?;
+    return Ok(firmware);
+}
+
+pub fn parse_hex_buffer(data: &str) -> Result<HexFile, Error> {
     // check addresses
-    let mut reader = Reader::new(&data);
+    let mut reader = Reader::new(data);
     let base_addr : u16 = reader.fold(0, |curr_addr, rec| 
         match rec {
             Ok(Record::ExtendedLinearAddress(addr)) => curr_addr + addr,
@@ -28,7 +63,7 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     );
 
     // file base addr
-    reader = Reader::new(&data);
+    reader = Reader::new(data);
     let data_addr : u16 = reader.filter(|rec| 
         match rec {
             Ok(Record::Data {offset: _, value: _}) => true,
@@ -41,17 +76,8 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
         }
     ).last().unwrap();
 
-    // // file max addr
-    // reader = Reader::new(&data);
-    // let file_max_offset = reader.fold(0, |curr_offset, rec| 
-    //     match rec {
-    //         Ok(Record::Data {offset, value}) => cmp::max(offset, curr_offset),
-    //         _ => curr_offset,
-    //     }
-    // );
-
     // file max addr
-    reader = Reader::new(&data);
+    reader = Reader::new(data);
     let data_size : u32 = reader.fold(0u32, |curr_len, rec| 
         match rec {
             Ok(Record::Data {offset: _, value}) => (value.len() as u32) + curr_len,
@@ -71,7 +97,7 @@ pub fn read_hex_file(filename: &Path) -> Result<HexFile, String> {
     // }
     //
     // data
-    reader = Reader::new(&data);
+    reader = Reader::new(data);
     let file_data = reader.fold(Vec::<u8>::new(), |mut data, rec| 
         match rec {
             Ok(Record::Data {offset: _, mut value}) => {

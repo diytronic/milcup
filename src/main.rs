@@ -16,7 +16,7 @@ use std::{
     },
 };
 
-mod hex;
+mod firmware;
 mod command;
 mod com_port;
 
@@ -38,13 +38,6 @@ struct Cli {
     // verify: bool,
     #[structopt(parse(from_os_str))]
     path: std::path::PathBuf,
-}
-
-
-impl From<command::FlashError> for std::io::Error {
-    fn from(err : command::FlashError) -> std::io::Error {
-        return Error::new(ErrorKind::Other, "Command error");
-    }
 }
 
 /// Try to find available port automatically
@@ -83,7 +76,33 @@ fn probe_port() -> Result<String, serialport::Error> {
     };
 }
 
-fn main() -> Result<(), std::io::Error> {
+#[derive(Debug)]
+pub enum AppError {
+    Io(io::Error),
+    SerialPort(serialport::Error),
+    FlashError(command::Error),
+    FirmwareError(firmware::Error),
+}
+
+impl From<serialport::Error> for AppError {
+    fn from(err: serialport::Error) -> AppError {
+        AppError::SerialPort(err)
+    }
+}
+
+impl From<command::Error> for AppError {
+    fn from(err: command::Error) -> AppError {
+        AppError::FlashError(err)
+    }
+}
+
+impl From<firmware::Error> for AppError {
+    fn from(err: firmware::Error) -> AppError {
+        AppError::FirmwareError(err)
+    }
+}
+
+fn main() -> Result<(), AppError> {
     let args = Cli::from_args();
 
     let mut settings: SerialPortSettings = Default::default();
@@ -119,24 +138,13 @@ fn main() -> Result<(), std::io::Error> {
 
     println!("Boot load");
 
-    let hex_file = "firmware/1986_BOOT_UART.hex";
-    match hex::read_hex_file(std::path::Path::new(hex_file)) {
-        Ok(hex_file) => {
-            println!("Hex buffer length {}", hex_file.buf.len());
+    let boot_loader = include_str!("../firmware/1986_BOOT_UART.hex");
+    let hex_file = firmware::parse_hex_buffer(boot_loader)?;
 
-            match command::boot_load(&mut port, hex_file) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-        },
-        Err(error) => {
-            eprintln!("Error: '{}'", error);
-            ::std::process::exit(1);
-        }
-    };
+    println!("Hex buffer length {}", hex_file.buf.len());
+
+    command::boot_load(&mut port, hex_file)?;
+    println!("ok");
 
     println!("Read board info");
     match command::read_info(&mut port) {
@@ -159,7 +167,7 @@ fn main() -> Result<(), std::io::Error> {
 
     // Program
     println!("Program chip");
-    match hex::read_hex_file(std::path::Path::new(&args.path)) {
+    match firmware::read_hex_file(std::path::Path::new(&args.path)) {
         Ok(hex_file) => {
             println!("Hex buffer length {}", hex_file.buf.len());
 

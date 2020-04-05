@@ -1,28 +1,30 @@
 /// Board interface commands
 ///
-use std::{
-    io::{
-        self, 
-        // Error,
-        // ErrorKind,
-    },
-};
+use std::io;
+use std::fmt;
 
 use crate::{
     com_port::{
-        ComPortError,
-        ComPortMethods,
-        ComPort
+        self,
+        ComPort,
+        IOMethods,
     },
-    firmware:: {
-        HexFile
-    }
+    firmware::HexFile,
 };
 
 #[derive(Debug)]
 pub enum Error {
     Io(io::Error),
-    Com(ComPortError),
+    SerialPort(com_port::Error),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref err) => write!(f, "[{}]", err),
+            Error::SerialPort(ref err) => write!(f, "Serial port error: {}", err),
+        }
+    }
 }
 
 impl From<io::Error> for Error {
@@ -31,9 +33,9 @@ impl From<io::Error> for Error {
     }
 }
 
-impl From<ComPortError> for Error {
-    fn from(err: ComPortError) -> Error {
-        Error::Com(err)
+impl From<com_port::Error> for Error {
+    fn from(err: com_port::Error) -> Error {
+        Error::SerialPort(err)
     }
 }
 
@@ -252,6 +254,7 @@ fn verify_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error>
         None => false,
         Some(vbuf) => {
             port.write_str("V")?;
+            // std::thread::sleep(Duration::from_secs(1));
             let rbuf = port.read_buf(8)?;
             println!("Verify {:0>2X?} == {:0>2X?}", rbuf, vbuf);
 

@@ -2,19 +2,14 @@ use structopt::StructOpt;
 use serialport::prelude::*;
 use serialport::SerialPortType;
 use std::time::Duration;
-// use std::io::{self, Write};
-// use std::fs;
-// use std::env;
-// use std::fs::File;
-// use std::io::Read;
+// use std::fmt;
+// use std::io;
 
-use std::{
-    io::{
-        self, 
-        Error,
-        ErrorKind,
-    },
-};
+use anyhow::{Context, Result, Error, anyhow, bail};
+
+#[macro_use]
+extern crate log;
+extern crate env_logger;
 
 mod firmware;
 mod command;
@@ -46,7 +41,7 @@ struct Cli {
 /// In other cases - no ports available or more than 1 port - cause an error and prompt
 /// to specify port explicitly
 ///
-fn probe_port() -> Result<String, serialport::Error> {
+fn probe_port() -> Result<String, anyhow::Error> {
     let ports = serialport::available_ports()?;
     let mdr_ports = ports // we need only USB-COM ports
         .into_iter()
@@ -70,39 +65,88 @@ fn probe_port() -> Result<String, serialport::Error> {
         .collect::<Vec<SerialPortInfo>>();
 
     return match mdr_ports.len() {
-        0 => Err(serialport::Error::new(serialport::ErrorKind::Unknown, "No ports found")),
+        0 => Err(bail!("There are no available COM ports found")),
         1 => Ok(mdr_ports.last().unwrap().port_name.clone()),
-        n => Err(serialport::Error::new( serialport::ErrorKind::Unknown, "open() not implemented for platform"))
+        n => {
+            let names = mdr_ports.iter().map(|port| port.port_name.clone()).collect::<String>();
+            return Err(bail!("{} COM ports found choose right one with --port key {}", n, names));
+        }
     };
 }
 
-#[derive(Debug)]
-pub enum AppError {
-    Io(io::Error),
-    SerialPort(serialport::Error),
-    FlashError(command::Error),
-    FirmwareError(firmware::Error),
-}
+// pub enum AppError {
+//     Io(io::Error),
+//     SerialPort(serialport::Error),
+//     CommandError(command::Error),
+//     FirmwareError(firmware::Error),
+// }
+//
+// impl From<serialport::Error> for AppError {
+//     fn from(err: serialport::Error) -> AppError {
+//         AppError::SerialPort(err)
+//     }
+// }
+//
+// impl From<command::Error> for AppError {
+//     fn from(err: command::Error) -> AppError {
+//         AppError::CommandError(err)
+//     }
+// }
+//
+// impl From<firmware::Error> for AppError {
+//     fn from(err: firmware::Error) -> AppError {
+//         AppError::FirmwareError(err)
+//     }
+// }
+//
+// impl fmt::Display for AppError {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match *self {
+//             AppError::Io(ref err) => write!(f, "IO error: {}", err),
+//             AppError::SerialPort(ref err) => write!(f, "Serial port error: {}", err),
+//             AppError::CommandError(ref err) => write!(f, "Command error: {}", err),
+//             AppError::FirmwareError(ref err) => write!(f, "Firmware error: {}", err),
+//         }
+//     }
+// }
+//
+// impl fmt::Debug for AppError {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match *self {
+//             AppError::Io(ref err) => write!(f, "IO error: {}", err),
+//             AppError::SerialPort(ref err) => write!(f, "Serial port error: {}", err),
+//             AppError::CommandError(ref err) => write!(f, "Command error: {}", err),
+//             AppError::FirmwareError(ref err) => write!(f, "Firmware error: {}", err),
+//         }
+//     }
+// }
 
-impl From<serialport::Error> for AppError {
-    fn from(err: serialport::Error) -> AppError {
-        AppError::SerialPort(err)
+impl std::error::Error for command::Error {
+    fn description(&self) -> &str {
+        "My custom error message"
+    }
+
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        None
     }
 }
 
-impl From<command::Error> for AppError {
-    fn from(err: command::Error) -> AppError {
-        AppError::FlashError(err)
+impl std::error::Error for firmware::Error {
+    fn description(&self) -> &str {
+        "My custom error message"
+    }
+
+    fn cause(&self) -> Option<&dyn std::error::Error> {
+        None
     }
 }
 
-impl From<firmware::Error> for AppError {
-    fn from(err: firmware::Error) -> AppError {
-        AppError::FirmwareError(err)
-    }
-}
+fn main() -> Result<()> {
+    env_logger::init();
+    warn!("[root] warn");
+    info!("[root] info");
+    debug!("[root] debug");
 
-fn main() -> Result<(), AppError> {
     let args = Cli::from_args();
 
     let mut settings: SerialPortSettings = Default::default();
@@ -110,90 +154,74 @@ fn main() -> Result<(), AppError> {
     settings.baud_rate = 9600; // initial baud rate
     
     let port_name = if args.port_name == "auto" {
-        probe_port()?
+        probe_port().with_context(|| format!("Probe com port"))?
     } else {
         args.port_name
     };
 
-    println!("Discovered port {}", port_name);
+    // println!("Discovered port {}", port_name);
 
-    let mut port = serialport::open_with_settings(&port_name, &settings)?;
+    let mut port = serialport::open_with_settings(&port_name, &settings)
+        .with_context(|| format!("Open COM port with default baud rate 9600"))?;
 
-    println!("Checking port");
-    command::check_port(&mut port)?;
+    // println!("Checking port");
+    command::check_port(&mut port)
+        .with_context(|| format!("Check COM port availability"))?;
 
-    println!("Set baud rate {}", args.baud_rate);
-    command::set_baud_rate(&mut port, args.baud_rate);
+    // println!("Set baud rate {}", args.baud_rate);
+    command::set_baud_rate(&mut port, args.baud_rate)
+        .with_context(|| format!("Set baud rate"))?;
+        // .with_context(|| format!("Set baud rate {}", args.baud_rate))?;
 
-    std::mem::drop(port);
+    std::mem::drop(port); // close port 
 
-    settings.baud_rate = args.baud_rate;
+    settings.baud_rate = args.baud_rate; // set new baud rate
 
-    // reopen with new baud rate
-    let mut port = serialport::open_with_settings(&port_name, &settings)?;
-    println!("Open port with baud rate {}", settings.baud_rate);
+    // and reopen with new baud rate
+    let mut port = serialport::open_with_settings(&port_name, &settings)
+        .with_context(|| format!("Reopen port with new baud rate"))?;
+        // .with_context(|| format!("Reopen port with new baud rate {}", args.baud_rate))?;
+    // println!("Open port with baud rate {}", settings.baud_rate);
 
-    println!("Read baud rate");
-    command::read_baud_rate(&mut port)?;
+    // println!("Read baud rate");
+    command::read_baud_rate(&mut port)
+        .with_context(|| format!("Read baud rate settings"))?;
 
-    println!("Boot load");
+    // println!("Boot load");
 
     let boot_loader = include_str!("../firmware/1986_BOOT_UART.hex");
-    let hex_file = firmware::parse_hex_buffer(boot_loader)?;
+    let hex_file = firmware::parse_hex_buffer(boot_loader)
+        .with_context(|| format!("Parse boot loader code"))?;
 
-    println!("Hex buffer length {}", hex_file.buf.len());
+    // println!("Hex buffer length {}", hex_file.buf.len());
 
-    command::boot_load(&mut port, hex_file)?;
-    println!("ok");
+    command::boot_load(&mut port, hex_file)
+        .with_context(|| format!("Load boot loader code to board RAM"))?;
+    // println!("ok");
 
-    println!("Read board info");
-    match command::read_info(&mut port) {
-        Ok(str) => println!("ok {}", str),
-        Err(e) => {
-            eprintln!("{:?}", e);
-            ::std::process::exit(1);
-        }
-    }
+    // println!("Read board info");
+    command::read_info(&mut port)
+        .with_context(|| format!("Read boot loader identifier string"))?;
 
     // Erase
     println!("Erase chip");
-    match command::erase(&mut port) {
-        Ok(_) => println!("ok"),
-        Err(e) => {
-            eprintln!("{:?}", e);
-            ::std::process::exit(1);
-        }
-    }
+    command::erase(&mut port)
+        .with_context(|| format!("Erase chip"))?;
 
     // Program
-    println!("Program chip");
-    match firmware::read_hex_file(std::path::Path::new(&args.path)) {
-        Ok(hex_file) => {
-            println!("Hex buffer length {}", hex_file.buf.len());
+    // println!("Program chip");
+    let program_code  = firmware::read_hex_file(std::path::Path::new(&args.path))
+        .with_context(|| format!("Read firmware program code"))?;
 
-            match command::program(&mut port, &hex_file) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
+    // println!("Hex buffer length {}", program_code.buf.len());
 
-            // Verify
-            println!("Verify chip");
-            match command::verify(&mut port, &hex_file) {
-                Ok(_) => println!("ok"),
-                Err(e) => {
-                    eprintln!("{:?}", e);
-                    ::std::process::exit(1);
-                }
-            }
-        },
-        Err(error) => {
-            eprintln!("Error: '{}'", error);
-            ::std::process::exit(1);
-        }
-    };
+    command::program(&mut port, &program_code)
+        .with_context(|| format!("Flash program firmware"))?;
+
+    // Verify
+    // println!("Verify chip");
+    command::verify(&mut port, &program_code)
+        .with_context(|| format!("Verify written data"))?;
 
     return Ok(());
 }

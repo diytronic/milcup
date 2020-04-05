@@ -1,10 +1,8 @@
 use std::{
     fs,
     fmt,
+    io,
     path::Path,
-    io::{
-        self,
-    },
 };
 
 use ihex::{

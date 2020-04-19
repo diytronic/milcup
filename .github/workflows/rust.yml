@@ -8,6 +8,8 @@ on:
 
 jobs:
   build_linux:
+    name: Build Linux release
+
     runs-on: ubuntu-latest
 
     strategy:
@@ -17,11 +19,16 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+
+      - name: Install development dependencies
+        run: sudo apt-get update -y && sudo apt-get install pkg-config libudev1 libudev-dev
+
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           target: ${{ matrix.target }}
           override: true
+
       - uses: actions-rs/cargo@v1
         with:
           command: build

@@ -20,6 +20,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v1
+        
       - name: Cache Rust dependencies
         uses: actions/cache@v2.1.5
         with:
@@ -28,12 +29,14 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: beta
           default: true
           override: true
+          
       - name: Install system dependencies
         run: |
           sudo apt-get update \
@@ -62,6 +65,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v1
+        
       - name: Cache Rust dependencies
         uses: actions/cache@v2.1.5
         with:
@@ -70,6 +74,7 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -93,20 +98,13 @@ jobs:
           overwrite: true
           file_glob: true
 
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v1-release
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/milcup
-          asset_name: milcup
-          tag: build-${{ github.ref }}
-
   build-windows:
     runs-on: windows-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v1
+        
       - name: Cache Rust dependencies
         uses: actions/cache@v2.1.5
         with:
@@ -115,6 +113,7 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -123,7 +122,7 @@ jobs:
           default: true
           override: true
 
-      - name: Build for mac
+      - name: Build for Windows
         uses: actions-rs/cargo@v1
         with:
           command: build

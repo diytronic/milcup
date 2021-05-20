@@ -48,13 +48,13 @@ jobs:
           args: --release --all-features --target=x86_64-unknown-linux-gnu
 
       - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v1-release
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/release/milcup
-          asset_name: milcup
-          tag: build-${{ github.ref }}
+          file: target/release/*
+          tag: ${{ github.ref }}
           overwrite: true
+          file_glob: true
 
   build-mac:
     runs-on: macos-latest

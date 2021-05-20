@@ -58,8 +58,8 @@ jobs:
           body: >
             Bla bla bla aboutthis release
           gzip: true
-          files: >
-            - target/x86_64-unknown-linux-gnu/release/milcup
+          files: /
+#            - target/x86_64-unknown-linux-gnu/release/milcup
 
 #      - name: Upload binaries to release
 #        uses: svenstaro/upload-release-action@v2

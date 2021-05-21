@@ -15,7 +15,21 @@ jobs:
   #     - run: cargo fmt -- --check
   
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            binary: milcup
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            binary: milcup.exe
+          - os: macOS-latest
+            target: x86_64-apple-darwin
+            binary: milcup
 
     steps:
       - name: Checkout
@@ -28,122 +42,32 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           
       - name: Install latest rust toolchain
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: beta
+          toolchain: stable
           default: true
           override: true
+          components: rustfmt, clippy
           
       - name: Install system dependencies
         run: |
-          sudo apt-get update \
-          && sudo apt-get install -y \
-          libudev-dev \
-          libdbus-1-dev
-      # - name: Build
-      #   run: cargo build --all --release && strip target/release/#{your taget here bin} && mv target/release/#{your taget here bin}  target/release/#{your final bin name here}
-      - uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features --target=x86_64-unknown-linux-gnu
+          sudo apt-get update && sudo apt-get install -y  libudev-dev  libdbus-1-dev
+        if: matrix.os == 'ubuntu-latest'
 
-      - uses: meeDamian/github-release@2.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: v0.0.1
-          name: MilcUp
-          body: >
-            Bla bla bla aboutthis release
-          gzip: true
-          files: /
-#            - target/x86_64-unknown-linux-gnu/release/milcup
-
-#      - name: Upload binaries to release
-#        uses: svenstaro/upload-release-action@v2
-#        with:
-#          repo_token: ${{ secrets.GITHUB_TOKEN }}
-#          file: target/x86_64-unknown-linux-gnu/release/milcup
-#          tag: ${{ github.ref }}
-#          overwrite: true
-#          file_glob: true
-
-  build-mac:
-    runs-on: macos-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-        
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: beta
-          target: x86_64-apple-darwin
-          default: true
-          override: true
-
-      - name: Build for mac
+      - name: Build
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --all-features --target=x86_64-apple-darwin
+          args: --release --all-features --target=${{ matrix.target }}
 
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/x86_64-apple-darwin/release/milcup
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
-
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-        
-      - name: Cache Rust dependencies
-        uses: actions/cache@v2.1.5
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          
-      - name: Install latest rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: beta
-          target: x86_64-pc-windows-msvc
-          default: true
-          override: true
-
-      - name: Build for Windows
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features --target=x86_64-pc-windows-msvc
-
-      - name: Upload binaries to release
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/x86_64-pc-windows-msvc/release/milcup.exe
-          tag: ${{ github.ref }}
-          overwrite: true
-          file_glob: true
+     - name: Upload binaries to release
+       uses: svenstaro/upload-release-action@v2
+       with:
+         repo_token: ${{ secrets.GITHUB_TOKEN }}
+         file: target/${{ matrix.target }}/release/${{ matrix.binary }}
+         tag: ${{ github.ref }}
+         overwrite: true
+         file_glob: true

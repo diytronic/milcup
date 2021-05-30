@@ -27,7 +27,7 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary: milcup.exe
-            asset_name: milcup-windows-amd64
+            asset_name: milcup-windows-amd64.exe
           - os: macOS-latest
             target: x86_64-apple-darwin
             binary: milcup

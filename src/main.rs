@@ -5,7 +5,7 @@ use std::time::Duration;
 // use std::fmt;
 // use std::io;
 
-use anyhow::{Context, Result, Error, anyhow, bail};
+use anyhow::{Context, Result, bail};
 
 #[macro_use]
 extern crate log;
@@ -65,11 +65,11 @@ fn probe_port() -> Result<String, anyhow::Error> {
         .collect::<Vec<SerialPortInfo>>();
 
     return match mdr_ports.len() {
-        0 => Err(bail!("There are no available COM ports found")),
+        0 => bail!("There are no available COM ports found"),
         1 => Ok(mdr_ports.last().unwrap().port_name.clone()),
         n => {
             let names = mdr_ports.iter().map(|port| port.port_name.clone()).collect::<String>();
-            return Err(bail!("{} COM ports found choose right one with --port key {}", n, names));
+            bail!("{} COM ports found choose right one with --port key {}", n, names);
         }
     };
 }

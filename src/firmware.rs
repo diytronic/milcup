@@ -38,7 +38,7 @@ impl From<std::io::Error> for Error {
 }
 
 impl From<Error> for std::io::Error {
-    fn from(err : Error) -> std::io::Error {
+    fn from(_err : Error) -> std::io::Error {
         return std::io::Error::new(std::io::ErrorKind::Other, "Firmware Error");
     }
 }

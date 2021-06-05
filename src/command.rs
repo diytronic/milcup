@@ -262,23 +262,40 @@ fn verify_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error>
     debug!("Verify chunk");
     
     // check 32 chunks of 8 bytes blocks
-    let mut iter = buf.chunks(8);
-    while match iter.next() { 
-        None => false,
-        Some(vbuf) => {
-            port.write_str("V")?;
-            // std::thread::sleep(Duration::from_secs(1));
-            let rbuf = port.read_buf(8)?;
-            debug!("Verify {:0>2X?} == {:0>2X?}", rbuf, vbuf);
+    // let mut iter = buf.chunks(8);
+    // while match iter.next() { 
+    //     None => false,
+    //     Some(vbuf) => {
+    //         port.write_str("V")?;
+    //         // std::thread::sleep(Duration::from_secs(1));
+    //         let rbuf = port.read_buf(8)?;
+    //         debug!("Verify -> {:0>2X?}", vbuf);
+    //         debug!("       <- {:0>2X?}", rbuf);
+    //
+    //         let buf_len = vbuf.len();
+    //         if rbuf[0..buf_len] != vbuf[0..buf_len] {
+    //             return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error verify block")));
+    //         }
+    //
+    //         true
+    //     }
+    // } {};
 
-            let buf_len = vbuf.len();
-            if rbuf[0..buf_len] != vbuf[0..buf_len] {
-                return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error verify block")));
-            }
+    let iter = buf.chunks(8);
+    for vbuf in iter { 
+        port.write_str("V")?;
+        // std::thread::sleep(Duration::from_secs(1));
+        let rbuf = port.read_buf(8)?;
+        debug!("Verify -> {:0>2X?}", vbuf);
+        debug!("       <- {:0>2X?}", rbuf);
 
-            true
+        let buf_len = vbuf.len();
+        if rbuf[0..buf_len] != vbuf[0..buf_len] {
+            return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error verify block")));
         }
-    } {};
+    }
+
+    debug!("");
 
     Ok(true)
 }

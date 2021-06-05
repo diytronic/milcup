@@ -1,9 +1,6 @@
 use std::{
     fmt,
-    io::{
-        self, 
-        Write,  
-    },
+    io::{ self, Write },
     boxed::Box,
 };
 
@@ -46,7 +43,7 @@ pub trait IOMethods {
 impl IOMethods for ComPort {
     fn write_buf(&mut self, buf: Vec<u8>) -> Result<(), Error> {
         // println!("Write buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
-        println!("Write buf: {:0>2X?}", buf);
+        debug!("Write buf: {:0>2X?}", buf);
         self.write(&buf)?;
         std::io::stdout().flush().unwrap();
         return Ok(());
@@ -65,7 +62,7 @@ impl IOMethods for ComPort {
         self.read(buf.as_mut_slice())?;
         // println!("Read buf: {:0>2X?} {}", buf, std::str::from_utf8_unchecked(&buf));
         // println!("Read buf: {:0>2X?} {}", buf, String::from_utf8_lossy(&buf));
-        println!("Read buf: {:0>2X?}", buf);
+        debug!(" Read buf: {:0>2X?}", buf);
         return Ok(buf);
     }
 

@@ -3,6 +3,8 @@
 use std::io;
 use std::fmt;
 
+use indicatif::ProgressIterator;
+
 use crate::{
     com_port::{
         self,
@@ -72,8 +74,8 @@ pub fn set_baud_rate(port: &mut ComPort, baud_rate: u32) -> Result<(), Error> {
 
 pub fn read_baud_rate(port: &mut ComPort) -> Result<Vec<u8>, Error> {
     port.write_buf(vec![0xD])?;
-    let resp = port.read_buf(3)?;
 
+    let resp = port.read_buf(3)?;
     if resp != [0xD, 0xA, 0x3E] {
         return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error setting baud rate")));
     }
@@ -89,8 +91,8 @@ pub fn read_baud_rate(port: &mut ComPort) -> Result<Vec<u8>, Error> {
 /// Boot loader uploaded to base address 0x20000000
 ///
 pub fn boot_load(port: &mut ComPort, data: HexFile) -> Result<(), Error> {
-    println!("Writing boot code to {:0>8X?}", data.addr);
-    println!("Data size is {} bytes", data.size);
+    // println!("Writing boot code to {:0>8X?}", data.addr);
+    // println!("Data size is {} bytes", data.size);
 
     // set address where to put boot loader
     port.write_str("L")?;
@@ -165,8 +167,8 @@ pub fn erase(port: &mut ComPort) -> Result<(), Error> {
 /// Upload real firmware to flash
 ///
 pub fn program(port: &mut ComPort, data: &HexFile) -> Result<(), Error> {
-    println!("Writing program code to {:0>8X?}", data.addr);
-    println!("Data size is {} bytes", data.size);
+    // println!("Writing program code to {:0>8X?}", data.addr);
+    // println!("Data size is {} bytes", data.size);
 
     // set address where to put program
     port.write_str("A")?;
@@ -176,14 +178,20 @@ pub fn program(port: &mut ComPort, data: &HexFile) -> Result<(), Error> {
     }
 
     // write code by 256 byte length chunks
-    let mut iter = data.buf.chunks(256);
-    while match iter.next() { 
-        None => false,
-        Some(wbuf) => {
-          let res =  write_program_chunk(port, wbuf)?;
-          res
-        }
-    } {};
+    // let mut iter = data.buf.chunks(256);
+    // while match iter.next() { 
+    //     None => false,
+    //     Some(wbuf) => {
+    //       let res =  write_program_chunk(port, wbuf)?;
+    //       res
+    //     }
+    // } {};
+
+    // write code by 256 byte length chunks
+    let iter = data.buf.chunks(256);
+    for wbuf in iter.progress() { 
+       write_program_chunk(port, wbuf)?;
+    };
     
     return Ok(());
 }
@@ -198,15 +206,20 @@ pub fn verify(port: &mut ComPort, data: &HexFile) -> Result<(), Error> {
         return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error setting flash address")));
     }
 
-    // write code by 256 byte length chunks
-    let mut iter = data.buf.chunks(256);
-    while match iter.next() { 
-        None => false,
-        Some(wbuf) => {
-          let res =  verify_program_chunk(port, wbuf)?;
-          res
-        }
-    } {};
+    // // write code by 256 byte length chunks
+    // let mut iter = data.buf.chunks(256);
+    // while match iter.next() { 
+    //     None => false,
+    //     Some(wbuf) => {
+    //       let res =  verify_program_chunk(port, wbuf)?;
+    //       res
+    //     }
+    // } {};
+
+    let iter = data.buf.chunks(256);
+    for wbuf in iter.progress() { 
+       verify_program_chunk(port, wbuf)?;
+    };
     
     return Ok(());
 }
@@ -226,18 +239,18 @@ fn write_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error> 
 
     let diff = 256 - buf.len(); // number of bytes up to 256
     if diff > 0 {
-        println!("Add {} of bytes up to 256", diff);
+        debug!("Add {} of zero bytes up to 256 bytes length", diff);
         wbuf.append(&mut vec![0x00; diff]);
     }
 
-    println!("Writing chunk");
+    debug!("Writing chunk");
     port.write_str("P")?;
     port.write_buf(wbuf.to_vec())?;
 
     let sum : u8 = checksum(&wbuf);    // calcuate by written data
     let rsum : u8 = port.read_byte()?; // return from UART
 
-    println!("Checking control sum {:0>2X?} == {:0>2X?}", sum, rsum);
+    debug!("Checking control sum {:0>2X?} == {:0>2X?}", sum, rsum);
     if rsum != sum {
         return Err(Error::Io(io::Error::new(io::ErrorKind::Other, "Error checking control sum")));
     }
@@ -246,7 +259,7 @@ fn write_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error> 
 }
 
 fn verify_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error>  {
-    println!("Verify chunk");
+    debug!("Verify chunk");
     
     // check 32 chunks of 8 bytes blocks
     let mut iter = buf.chunks(8);
@@ -256,7 +269,7 @@ fn verify_program_chunk(port: &mut ComPort, buf : &[u8]) ->  Result<bool, Error>
             port.write_str("V")?;
             // std::thread::sleep(Duration::from_secs(1));
             let rbuf = port.read_buf(8)?;
-            println!("Verify {:0>2X?} == {:0>2X?}", rbuf, vbuf);
+            debug!("Verify {:0>2X?} == {:0>2X?}", rbuf, vbuf);
 
             let buf_len = vbuf.len();
             if rbuf[0..buf_len] != vbuf[0..buf_len] {

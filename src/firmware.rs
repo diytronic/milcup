@@ -83,12 +83,9 @@ pub fn parse_hex_buffer(data: &str) -> Result<HexFile, Error> {
         }
     );
 
-    println!("  Base addr: 0x{:0>6X?}", base_addr);
-    println!("  Data addr: 0x{:0>6X?}", data_addr);
     // println!("   Max addr: 0x{:0>6X?}", file_max_offset);
-    println!("Data length: 0x{:0>6X?}", data_size);
-    println!("           0x08000000");
-    println!("           0x20000000");
+    // println!("           0x08000000");
+    // println!("           0x20000000");
 
     // if file_data_len > max_size {
     //     return Err("Oversize".to_string());
@@ -107,20 +104,20 @@ pub fn parse_hex_buffer(data: &str) -> Result<HexFile, Error> {
     );
 
     reader = Reader::new(&data);
-    let x = reader.map(|r| 
+    let _x = reader.map(|r| 
         match r {
-            Ok(Record::Data {offset, value}) => println!("Data: offset: 0x{:X?} len: {}", offset, value.len()),
-            Ok(Record::ExtendedLinearAddress(addr)) => println!("Extended Linear address: 0x{:X?}", addr),
-            Ok(Record::StartLinearAddress(addr)) => println!("Start Linear address: {}", addr),
-            Ok(Record::ExtendedSegmentAddress(addr)) => println!("Extended segment address: 0x{:X?}", addr),
-            Ok(Record::StartSegmentAddress {cs, ip}) => println!("Start segment address: {} {}", cs, ip),
-            Ok(Record::EndOfFile) => println!("END"),
+            Ok(Record::Data {offset, value})         => debug!("Data at offset: 0x{:X?} len: {}", offset, value.len()),
+            Ok(Record::ExtendedLinearAddress(addr))  => debug!("Extended Linear address: 0x{:X?}", addr),
+            Ok(Record::StartLinearAddress(addr))     => debug!("Start Linear address: {}", addr),
+            Ok(Record::ExtendedSegmentAddress(addr)) => debug!("Extended segment address: 0x{:X?}", addr),
+            Ok(Record::StartSegmentAddress {cs, ip}) => debug!("Start segment address: {} {}", cs, ip),
+            Ok(Record::EndOfFile)                    => debug!("END"),
             // Ok(_) => eprintln!("Unknown record"),
-            Err(err) => eprintln!("{}", err)
+            Err(err) => error!("{}", err)
         }
     );
 
-    println!("Reader count: {}", x.count());
+    // println!("Reader count: {}", x.count());
 
     // let lines = buf
     //     .lines()
@@ -140,9 +137,11 @@ pub fn parse_hex_buffer(data: &str) -> Result<HexFile, Error> {
         buf: file_data,
     };
 
-    println!("Load addr: 0x{:0>6X?}", hex_file.addr);
+    println!("    Base addr: 0x{:0>8X?}", base_addr);
+    println!("    Data addr: 0x{:0>8X?}", data_addr);
+    println!("    Load addr: 0x{:0>8X?}", hex_file.addr);
+    println!("         Size: {} bytes", data_size);
 
     return Ok(hex_file);
 }
-
 

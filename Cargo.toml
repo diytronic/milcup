@@ -13,4 +13,5 @@ ihex = { version = "1.1.2" }
 anyhow = { version = "1.0.0" }
 log = { version = "0.4.8" }
 env_logger = { version = "0.7.1" }
-
+indicatif = { version = "0.16.2" }
+console = { version = ">=0.9.1, <1.0.0", default-features = false }
